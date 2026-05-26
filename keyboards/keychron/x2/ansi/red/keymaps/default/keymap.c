@@ -15,6 +15,7 @@
  */
 
 #include QMK_KEYBOARD_H
+#include "programmable_button.h"
 
 enum layers{
   BASE,
@@ -68,22 +69,60 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 // clang-format on
 
+typedef enum {
+    NOVA_NORMAL,
+    NOVA_PB,
+} nova_action_type_t;
+
+typedef struct {
+    nova_action_type_t type;
+    uint16_t code;
+} nova_action_t;
+
 typedef struct {
     uint16_t keycode;
-    uint16_t tap;
-    uint16_t hold;
+    nova_action_t tap;
+    nova_action_t hold;
     bool active;
     bool interrupted;
     bool hold_registered;
 } nova_dual_t;
 
+#define NORMAL_ACTION(kc) { NOVA_NORMAL, (kc) }
+#define PB_ACTION(index)  { NOVA_PB,     (index) }
+
 static nova_dual_t nova_duals[] = {
-    { N_RALT, PB_12,  PB_25,   false, false, false },
-    { N_FN,   KC_APP, KC_RCTL, false, false, false },
-    { N_MENU, PB_26,  PB_27,   false, false, false },
-    { N_INS,  KC_INS, PB_29,   false, false, false },
-    { N_RSFT, KC_CAPS, KC_RSFT, false, false, false },
+    { N_RALT, PB_ACTION(12),          PB_ACTION(25),      false, false, false },
+    { N_FN,   NORMAL_ACTION(KC_APP), NORMAL_ACTION(KC_RCTL), false, false, false },
+    { N_MENU, PB_ACTION(26),         PB_ACTION(27),      false, false, false },
+    { N_INS,  NORMAL_ACTION(KC_INS), PB_ACTION(29),      false, false, false },
+    { N_RSFT, NORMAL_ACTION(KC_CAPS), NORMAL_ACTION(KC_RSFT), false, false, false },
 };
+
+static void nova_register_action(nova_action_t action) {
+    if (action.type == NOVA_PB) {
+        programmable_button_register((uint8_t)action.code);
+    } else {
+        register_code16(action.code);
+    }
+}
+
+static void nova_unregister_action(nova_action_t action) {
+    if (action.type == NOVA_PB) {
+        programmable_button_unregister((uint8_t)action.code);
+    } else {
+        unregister_code16(action.code);
+    }
+}
+
+static void nova_tap_action(nova_action_t action) {
+    if (action.type == NOVA_PB) {
+        programmable_button_register((uint8_t)action.code);
+        programmable_button_unregister((uint8_t)action.code);
+    } else {
+        tap_code16(action.code);
+    }
+}
 
 static nova_dual_t *find_nova_dual(uint16_t keycode) {
     for (uint8_t i = 0; i < ARRAY_SIZE(nova_duals); i++) {
@@ -104,7 +143,7 @@ static void promote_other_pending_duals(uint16_t keycode) {
 
         d->interrupted = true;
         d->hold_registered = true;
-        register_code16(d->hold);
+        nova_register_action(d->hold);
     }
 }
 
@@ -127,9 +166,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (d->hold_registered) {
-        unregister_code16(d->hold);
+        nova_unregister_action(d->hold);
     } else if (!d->interrupted) {
-        tap_code16(d->tap);
+        nova_tap_action(d->tap);
     }
 
     d->active = false;

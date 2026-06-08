@@ -1,0 +1,1 @@
+keyboards/keychron/x2/ansi/red/keymaps/default/keymap.c

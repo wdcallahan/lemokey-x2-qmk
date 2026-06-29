@@ -28,7 +28,6 @@ enum custom_keycodes {
     N_FN,
     N_MENU,
     N_INS,
-    N_RSFT,
 };
 #define KC_TASK LGUI(KC_TAB)
 #define KC_FLXP LGUI(KC_E)
@@ -40,7 +39,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_GRV,     KC_1,     KC_2,     KC_3,     KC_4,     KC_5,     KC_6,     KC_7,     KC_8,     KC_9,     KC_0,     KC_MINS,    KC_EQL,   KC_BSPC,    N_INS,    KC_HOME,  KC_PGUP,  TG(MOUSE),  KC_PSLS,  KC_PAST,  KC_PMNS,
         KC_TAB,     KC_Q,     KC_W,     KC_E,     KC_R,     KC_T,     KC_Y,     KC_U,     KC_I,     KC_O,     KC_P,     KC_LBRC,    KC_RBRC,  KC_BSLS,    KC_DEL,   KC_END,   KC_PGDN,  KC_P7,      KC_P8,    KC_P9,    KC_PPLS,
         PB_11,	    KC_A,     KC_S,     KC_D,     KC_F,     KC_G,     KC_H,     KC_J,     KC_K,     KC_L,     KC_SCLN,  KC_QUOT,              KC_ENT,                                   KC_P4,      KC_P5,    KC_P6,
-        KC_LSFT,              KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,              N_RSFT,               KC_UP,              KC_P1,      KC_P2,    KC_P3,    KC_PENT,
+        KC_LSFT,              KC_Z,     KC_X,     KC_C,     KC_V,     KC_B,     KC_N,     KC_M,     KC_COMM,  KC_DOT,   KC_SLSH,              KC_RSFT,              KC_UP,              KC_P1,      KC_P2,    KC_P3,    KC_PENT,
         KC_LCTL,    KC_LWIN,  KC_LALT,                                KC_SPC,                                 PB_28,    N_FN,       N_MENU,   N_RCTL,     KC_LEFT,  KC_DOWN,  KC_RGHT,  KC_P0,                KC_PDOT         ),
 
     [MOUSE] = LAYOUT_104_ansi(
@@ -68,7 +67,49 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 // clang-format on
+#define NOVA_NUMLOCK_REASSERT_DELAY 50
+#define NOVA_NUMLOCK_WATCHDOG_INTERVAL 1000
 
+static bool nova_numlock_reassert_pending = true;
+static uint32_t nova_numlock_reassert_timer = 0;
+
+static void nova_request_numlock_reassert(void) {
+    nova_numlock_reassert_pending = true;
+    nova_numlock_reassert_timer = timer_read32();
+}
+
+static void nova_numlock_guard_task(void) {
+    if (nova_numlock_reassert_pending &&
+        timer_elapsed32(nova_numlock_reassert_timer) >= NOVA_NUMLOCK_REASSERT_DELAY) {
+
+        nova_numlock_reassert_pending = false;
+
+        if (!host_keyboard_led_state().num_lock) {
+            tap_code(KC_NUM_LOCK);
+        }
+    }
+
+    if (!host_keyboard_led_state().num_lock &&
+        timer_elapsed32(nova_numlock_reassert_timer) >= NOVA_NUMLOCK_WATCHDOG_INTERVAL) {
+        nova_request_numlock_reassert();
+    }
+}
+
+void keyboard_post_init_user(void) {
+    nova_request_numlock_reassert();
+}
+
+bool led_update_user(led_t led_state) {
+    if (!led_state.num_lock) {
+        nova_request_numlock_reassert();
+    }
+
+    return true;
+}
+
+void housekeeping_task_user(void) {
+    nova_numlock_guard_task();
+}
 typedef enum {
     NOVA_NORMAL,
     NOVA_PB,
@@ -96,7 +137,6 @@ static nova_dual_t nova_duals[] = {
     { N_FN,   NORMAL_ACTION(KC_APP), NORMAL_ACTION(KC_RCTL), false, false, false },
     { N_MENU, PB_ACTION(26),         PB_ACTION(27),      false, false, false },
     { N_INS,  NORMAL_ACTION(KC_INS), PB_ACTION(29),      false, false, false },
-    { N_RSFT, NORMAL_ACTION(KC_CAPS), NORMAL_ACTION(KC_RSFT), false, false, false },
 };
 
 static void nova_register_action(nova_action_t action) {

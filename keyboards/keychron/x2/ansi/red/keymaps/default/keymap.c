@@ -134,8 +134,8 @@ typedef struct {
 
 static nova_dual_t nova_duals[] = {
     { N_RCTL, PB_ACTION(12),          PB_ACTION(25),      false, false, false },
-    { N_FN,   NORMAL_ACTION(KC_APP), NORMAL_ACTION(KC_RCTL), false, false, false },
-    { N_MENU, PB_ACTION(26),         PB_ACTION(27),      false, false, false },
+    { N_FN,   NORMAL_ACTION(KC_MENU), NORMAL_ACTION(KC_RCTL), false, false, false },
+    { N_MENU, PB_ACTION(26),         NORMAL_ACTION(KC_APP), false, false, false },
     { N_INS,  NORMAL_ACTION(KC_INS), PB_ACTION(29),      false, false, false },
 };
 

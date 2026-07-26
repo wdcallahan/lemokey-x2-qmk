@@ -67,49 +67,70 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 // clang-format on
-#define NOVA_NUMLOCK_REASSERT_DELAY 50
-#define NOVA_NUMLOCK_WATCHDOG_INTERVAL 1000
+#define NOVA_SCROLL_LED_BLINK_INTERVAL 250
 
-static bool nova_numlock_reassert_pending = true;
-static uint32_t nova_numlock_reassert_timer = 0;
+// The physical Num Lock lamp reports Nova's pointer layers. It never sends
+// KC_NUM_LOCK or mirrors the host's Num Lock state.
+static bool     nova_suspended        = false;
+static bool     nova_scroll_led_on    = true;
+static uint32_t nova_scroll_led_timer = 0;
 
-static void nova_request_numlock_reassert(void) {
-    nova_numlock_reassert_pending = true;
-    nova_numlock_reassert_timer = timer_read32();
+static void nova_update_layer_indicator(layer_state_t state, led_t led_state) {
+    if (nova_suspended) {
+        led_state.raw = 0;
+    } else if (layer_state_cmp(state, SCROLL)) {
+        led_state.num_lock = nova_scroll_led_on;
+    } else {
+        led_state.num_lock = layer_state_cmp(state, MOUSE);
+    }
+
+    led_update_ports(led_state);
 }
 
-static void nova_numlock_guard_task(void) {
-    if (nova_numlock_reassert_pending &&
-        timer_elapsed32(nova_numlock_reassert_timer) >= NOVA_NUMLOCK_REASSERT_DELAY) {
-
-        nova_numlock_reassert_pending = false;
-
-        if (!host_keyboard_led_state().num_lock) {
-            tap_code(KC_NUM_LOCK);
-        }
-    }
-
-    if (!host_keyboard_led_state().num_lock &&
-        timer_elapsed32(nova_numlock_reassert_timer) >= NOVA_NUMLOCK_WATCHDOG_INTERVAL) {
-        nova_request_numlock_reassert();
-    }
+static void nova_refresh_layer_indicator(layer_state_t state) {
+    nova_update_layer_indicator(state, host_keyboard_led_state());
 }
 
 void keyboard_post_init_user(void) {
-    nova_request_numlock_reassert();
+    nova_scroll_led_timer = timer_read32();
+    nova_refresh_layer_indicator(layer_state);
 }
 
 bool led_update_user(led_t led_state) {
-    if (!led_state.num_lock) {
-        nova_request_numlock_reassert();
+    nova_update_layer_indicator(layer_state, led_state);
+    return false;
+}
+
+layer_state_t layer_state_set_user(layer_state_t state) {
+    if (layer_state_cmp(state, SCROLL)) {
+        nova_scroll_led_on    = true;
+        nova_scroll_led_timer = timer_read32();
     }
 
-    return true;
+    nova_refresh_layer_indicator(state);
+    return state;
 }
 
 void housekeeping_task_user(void) {
-    nova_numlock_guard_task();
+    if (!nova_suspended && layer_state_is(SCROLL) && timer_elapsed32(nova_scroll_led_timer) >= NOVA_SCROLL_LED_BLINK_INTERVAL) {
+        nova_scroll_led_on    = !nova_scroll_led_on;
+        nova_scroll_led_timer = timer_read32();
+        nova_refresh_layer_indicator(layer_state);
+    }
 }
+
+void suspend_power_down_user(void) {
+    nova_suspended = true;
+    nova_refresh_layer_indicator(layer_state);
+}
+
+void suspend_wakeup_init_user(void) {
+    nova_suspended        = false;
+    nova_scroll_led_on    = true;
+    nova_scroll_led_timer = timer_read32();
+    nova_refresh_layer_indicator(layer_state);
+}
+
 typedef enum {
     NOVA_NORMAL,
     NOVA_PB,

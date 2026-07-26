@@ -1,20 +1,23 @@
-# Lemokey X3
+# Lemokey X2
 
-![Lemokey X3]()
-
-A customizable 80% TKL keyboard.
+A customizable full-size ANSI keyboard.
 
 * Keyboard Maintainer: [Keychron](https://github.com/keychron)
-* Hardware Supported: Lemokey X3
+* Hardware Supported: Lemokey X2
 * Hardware Availability: [Keychron](https://www.keychron.com)
 
 Make example for this keyboard (after setting up your build environment):
 
-    make keychron/x3/ansi/red:default
+    make keychron/x2/ansi/red:default
 
 Flashing example for this keyboard:
 
-    make keychron/x3/ansi/red:default:flash
+    make keychron/x2/ansi/red:default:flash
+
+The `default` keymap on the `nova/x2-baseline` branch is Nova's accepted
+personal firmware. Its behavior and relationship to the host-side layout are
+documented in the
+[keymap README](ansi/red/keymaps/default/README.md).
 
 ## bootloader
 
